@@ -4,6 +4,7 @@ base:
     - security
     - fail2ban
     - logrotate
+    - sops
 
   'role:db':
     - match: grain
@@ -49,3 +50,4 @@ base:
     - backup
     - fail2ban
     - logrotate
+    - sops

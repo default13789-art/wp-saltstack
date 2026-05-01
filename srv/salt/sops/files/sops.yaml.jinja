@@ -1,0 +1,3 @@
+creation_rules:
+  - path_regex: ^srv/pillar/secrets\.sls$
+    age: {{ age_pub | default('REPLACE_WITH_AGE_PUBLIC_KEY') }}

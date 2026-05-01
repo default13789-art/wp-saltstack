@@ -89,4 +89,8 @@
     'f2b_wp_login_max_retry': fail2ban.get('wp_login', {}).get('max_retry', 5),
     'f2b_wp_login_find_time': fail2ban.get('wp_login', {}).get('find_time', 600),
     'f2b_wp_login_ban_time': fail2ban.get('wp_login', {}).get('ban_time', 3600),
+    'sops_version':        '3.9.2',
+    'age_version':         '1.2.0',
+    'sops_secrets_file':   '/opt/wpadmin/srv/pillar/secrets.sls',
+    'sops_config_file':    '/opt/wpadmin/.sops.yaml',
 } %}
