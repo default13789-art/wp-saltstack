@@ -1,0 +1,16 @@
+[Unit]
+Description=Podman Auto-Update Containers
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=XDG_RUNTIME_DIR=/run/user/{{ podman_uid }}
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{{ podman_uid }}/bus
+ExecStart=/usr/bin/podman auto-update
+{% if cleanup_images %}
+ExecStartPost=/usr/bin/podman image prune -f
+{% endif %}
+
+ReadOnlyPaths=/etc
+ReadWritePaths=/var/tmp
