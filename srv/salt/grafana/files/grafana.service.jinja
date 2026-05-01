@@ -8,6 +8,7 @@ ExecStartPre=-/usr/bin/podman rm -f grafana
 ExecStart=/usr/bin/podman run \
     --name grafana \
     --rm \
+    --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ grafana_ip }} \
     -v {{ grafana_conf }}/grafana.ini:/etc/grafana/grafana.ini:ro,Z \

@@ -8,6 +8,7 @@ ExecStartPre=-/usr/bin/podman rm -f redis-exporter
 ExecStart=/usr/bin/podman run \
     --name redis-exporter \
     --rm \
+    --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ redis_exporter_ip }} \
     -e REDIS_ADDR=redis://{{ redis_ip }}:6379 \
