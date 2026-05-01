@@ -11,6 +11,13 @@ Production-grade WordPress deployment using **SaltStack** configuration manageme
 - **Object Caching** — Redis 7 for WordPress object cache and PHP session storage
 - **SaltStack Managed** — Idempotent, repeatable, version-controlled infrastructure
 - **Hardened Host** — UFW firewall (default DROP), SSH key-only auth on non-standard port, strong ciphers only
+- **Monitoring Stack** — Prometheus + Grafana with pre-built dashboards for Node, MySQL, Redis, and Nginx metrics
+- **Automated Backups** — Daily MySQL dumps, uploads, config, and Redis snapshots with rotation and restore
+- **Intrusion Prevention** — Fail2ban with SSH, Nginx HTTP auth, and WordPress login jails (UFW bans)
+- **Rate Limiting** — Nginx request/connection limits + wp-login.php brute-force protection
+- **Secrets Encryption** — SOPS + age encryption for secrets at rest in the git repository
+- **Container Auto-Updates** — Podman native auto-update with automatic rollback on health check failure
+- **WordPress Maintenance** — Automated core/plugin/theme updates, DB optimization, transient cleanup via WP-CLI
 
 ## Architecture
 
@@ -21,8 +28,8 @@ Production-grade WordPress deployment using **SaltStack** configuration manageme
                  │  UFW Firewall│  Ports: 80, 443, 2222 only
                  └──────┬───────┘
                  ┌──────▼───────┐
-                 │  Nginx (LB)  │  TLS termination, security headers
-                 │  10.89.0.2   │
+                 │  Nginx (LB)  │  TLS termination, security headers, rate limiting
+                 │  10.89.0.2   │  grafana.<domain> proxy
                  └──────┬───────┘
                  ┌──────▼───────┐
                  │ Anubis Bot   │  Allow / Challenge / Deny
@@ -44,6 +51,14 @@ Production-grade WordPress deployment using **SaltStack** configuration manageme
           │      MySQL 8.0        │  Database
           │     10.89.0.10        │
           └───────────────────────┘
+
+          ┌─────────── Monitoring Stack ───────────┐
+          │  Prometheus  10.89.0.40  Metrics       │
+          │  Grafana     10.89.0.41  Dashboards    │
+          │  Node Exp.   10.89.0.42  Host metrics  │
+          │  MySQL Exp.  10.89.0.43  DB metrics    │
+          │  Redis Exp.  10.89.0.44  Cache metrics │
+          └────────────────────────────────────────┘
 ```
 
 All containers run rootless under `podman-wp` (UID 1001) on a private Podman bridge network (`10.89.0.0/24`). No database or cache port is exposed to the internet.
@@ -52,13 +67,17 @@ All containers run rootless under `podman-wp` (UID 1001) on a private Podman bri
 
 | Component | Version | Role |
 |-----------|---------|------|
-| Nginx | 1.25-alpine | Reverse proxy, load balancer, SSL termination |
+| Nginx | 1.25-alpine | Reverse proxy, load balancer, SSL termination, rate limiting |
 | WordPress | PHP 8.2 FPM Alpine | Application (2 nodes) |
 | MySQL | 8.0 | Database |
 | Redis | 7-alpine | Object cache, session storage |
 | Anubis | latest | Bot protection (challenge/allow/deny) |
+| Prometheus | latest | Metrics collection and alerting |
+| Grafana | latest | Dashboards and visualization |
+| Fail2ban | system | Intrusion prevention (SSH, Nginx, WP login) |
+| SOPS + age | 3.9.2 / 1.2.0 | Secrets encryption at rest |
 | SaltStack | Masterless | Configuration management |
-| Podman | Rootless | Container runtime |
+| Podman | Rootless | Container runtime with auto-update |
 
 ## Quick Start
 
@@ -96,6 +115,11 @@ All configuration lives in `srv/pillar/`:
 | `secrets.sls` | Database passwords, Redis password, WordPress salts |
 | `network.sls` | Domain, IPs, ports, subnet |
 | `users.sls` | Podman user and namespace mapping |
+| `backup.sls` | Backup schedule, retention, offsite sync settings |
+| `fail2ban.sls` | Ban time, find time, max retry, jail toggles |
+| `monitoring_grafana.sls` | Monitoring IPs, Grafana admin password, scrape intervals |
+| `autoupdate.sls` | Container update schedule and cleanup settings |
+| `wp_maintenance.sls` | WP-CLI update schedule, plugin excludes, DB optimization |
 
 Generate fresh secrets before deploying:
 
@@ -132,17 +156,32 @@ wpadmin/
     │   ├── top.sls         Pillar mapping
     │   ├── secrets.sls     Credentials (generate fresh, never commit)
     │   ├── network.sls     IPs, ports, domain
-    │   └── users.sls       Podman user config
+    │   ├── users.sls       Podman user config
+    │   ├── backup.sls      Backup schedule and retention
+    │   ├── fail2ban.sls    Intrusion prevention settings
+    │   ├── monitoring_grafana.sls  Monitoring stack config
+    │   ├── autoupdate.sls  Container update schedule
+    │   └── wp_maintenance.sls      WP-CLI automation config
     └── salt/
         ├── top.sls         Role to state mapping
         ├── map.jinja       Central variable lookup
-        ├── security/       UFW firewall + SSH hardening
+        ├── security/       UFW firewall + SSH hardening + rate limiting
         ├── podman/         Podman install, user, network
         ├── mysql/          MySQL 8.0 container
         ├── redis/          Redis 7 container
-        ├── wordpress/      2x PHP-FPM nodes + wp-config
-        ├── nginx/          Load balancer + SSL + Anubis upstream
-        └── anubis/         Bot protection with policy rules
+        ├── wordpress/      2x PHP-FPM nodes + wp-config + WP-CLI
+        ├── nginx/          Load balancer + SSL + Anubis + Grafana proxy + rate limiting
+        ├── anubis/         Bot protection with policy rules
+        ├── monitoring/     Beacons + reactors for automated remediation
+        ├── prometheus/     Metrics collection + scrape config
+        ├── exporters/      Node, MySQL, Redis metric exporters
+        ├── grafana/        Dashboards + auto-provisioned datasource
+        ├── backup/         Daily automated backups + restore
+        ├── fail2ban/       SSH, Nginx, WP login intrusion prevention
+        ├── logrotate/      Infrastructure log rotation
+        ├── sops/           Secrets encryption (SOPS + age)
+        ├── autoupdate/     Container auto-update timer with rollback
+        └── wp_maintenance/ WP-CLI update and optimization timer
 ```
 
 ## Operational Commands
@@ -157,9 +196,31 @@ sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$(id -u podman-wp) podman logs -f ng
 # Re-apply all Salt states (idempotent, safe to run anytime)
 sudo salt-call --local state.apply
 
-# WordPress CLI
+# WordPress CLI (via wrapper)
+wp --info
+wp plugin list
+wp user list
+
+# Run backups manually
 sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$(id -u podman-wp) \
-    podman exec wp-node1 wp --info
+    systemctl --user start wp-backup
+
+# Restore from backup
+/srv/wp/bin/backup-restore.sh list
+/srv/wp/bin/backup-restore.sh restore-db <file>
+
+# Run WordPress maintenance manually
+sudo systemctl start wp-maintenance
+
+# Trigger container updates manually
+sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$(id -u podman-wp) \
+    systemctl --user start wp-autoupdate
+
+# Check Grafana health
+curl http://10.89.0.41:3000/api/health
+
+# Check Prometheus targets
+curl http://10.89.0.40:9090/api/v1/targets
 ```
 
 ## Requirements

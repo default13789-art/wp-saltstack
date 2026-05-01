@@ -15,7 +15,12 @@ Complete documentation of every security measure in this stack, how it works, an
 - [Database Security](#database-security)
 - [Cache Security](#cache-security)
 - [Bot Protection](#bot-protection)
+- [Rate Limiting](#rate-limiting)
+- [Intrusion Prevention (Fail2ban)](#intrusion-prevention-fail2ban)
 - [Secrets Management](#secrets-management)
+- [Secrets Encryption (SOPS + age)](#secrets-encryption-sops--age)
+- [Container Auto-Updates](#container-auto-updates)
+- [WordPress Maintenance](#wordpress-maintenance)
 - [File Permissions](#file-permissions)
 - [Security Verification](#security-verification)
 - [Known Gaps & Recommendations](#known-gaps--recommendations)
@@ -77,7 +82,7 @@ Complete documentation of every security measure in this stack, how it works, an
 | Default OUTPUT policy | `ACCEPT` | Allow all outbound traffic |
 | Default FORWARD policy | `DROP` | Block forwarding unless explicitly allowed |
 | Logging | `low` | Log blocked packets for audit |
-| Allow SSH | Port `2222/tcp` | Non-standard SSH port to reduce scan noise |
+| Allow SSH | Port `2222/tcp` | Non-standard SSH port, rate-limited via `ufw limit` |
 | Allow HTTP | Port `80/tcp` | HTTP redirect + ACME challenges |
 | Allow HTTPS | Port `443/tcp` | TLS-terminated WordPress traffic |
 | Route allow | `10.89.0.0/24` | Permit container network traffic through the bridge |
@@ -168,16 +173,21 @@ attacker has zero host privileges
 
 ### Health Checks
 
-Every container has a health check configured, ensuring systemd auto-restarts failed services:
+Every container has a health check configured, ensuring systemd auto-restarts failed services and auto-updates can detect rollback conditions:
 
 | Container | Health Check | Restart Policy |
 |-----------|-------------|----------------|
-| MySQL | `mysqladmin ping` | `on-failure`, 5s delay |
+| MySQL | `mysqladmin ping` | `on-failure`, 10s delay |
 | Redis | `redis-cli ping` | `on-failure`, 5s delay |
-| WP Node 1 | PHP-FPM status ping | `on-failure`, 5s delay |
-| WP Node 2 | PHP-FPM status ping | `on-failure`, 5s delay |
-| Nginx | `curl localhost/health` | `on-failure`, 5s delay |
-| Anubis | No-op (always healthy) | `on-failure`, 5s delay |
+| WP Node 1 | PHP-FPM config test + process check | `on-failure`, 10s delay |
+| WP Node 2 | PHP-FPM config test + process check | `on-failure`, 10s delay |
+| Nginx | `wget localhost/health` | `on-failure`, 10s delay |
+| Anubis | No-op (always healthy) | `on-failure`, 10s delay |
+| Prometheus | `wget localhost:9090/-/healthy` | `on-failure`, 10s delay |
+| Grafana | `wget localhost:3000/api/health` | `on-failure`, 10s delay |
+| Node Exporter | `wget localhost:9100/metrics` | `on-failure`, 5s delay |
+| MySQL Exporter | `wget localhost:9104/metrics` | `on-failure`, 5s delay |
+| Redis Exporter | `wget localhost:9100/metrics` | `on-failure`, 5s delay |
 
 ### Systemd Service Dependencies
 
@@ -187,9 +197,12 @@ Containers are managed as systemd user services with enforced dependency orderin
 container-mysql  ←  container-redis  ←  container-wp-node1
                                       ←  container-wp-node2  ←  container-nginx
                                                                ←  container-anubis
-```
 
-If MySQL dies, all dependent containers are stopped. When MySQL recovers, dependents restart in order.
+container-nginx  ←  container-prometheus  ←  container-grafana
+                 ←  container-node-exporter
+container-mysql  ←  container-mysql-exporter
+container-redis  ←  container-redis-exporter
+```
 
 ---
 
@@ -370,6 +383,118 @@ Secrets are rendered into configs at `salt-call state.apply` time. They are not 
 
 ---
 
+## Rate Limiting
+
+### Nginx Rate Limiting
+
+**Configured in**: `srv/salt/nginx/files/nginx.conf.jinja`
+
+| Zone | Rate | Purpose |
+|------|------|---------|
+| `general` | 10 req/s per IP | All requests to WordPress backend |
+| `login` | 2 req/s per IP | `wp-login.php` specifically |
+| `conn_per_ip` | 20 connections per IP | Concurrent connection limit |
+
+- Returns HTTP 429 when limits are exceeded
+- `burst=20 nodelay` for general traffic, `burst=5 nodelay` for login
+- Applied on the internal port 8080 server block (behind Anubis)
+
+### UFW SSH Rate Limiting
+
+**Configured in**: `srv/salt/security/init.sls`
+
+SSH uses `ufw limit 2222/tcp` instead of `ufw allow`, which automatically blocks IPs that attempt more than 6 connections in 30 seconds.
+
+---
+
+## Intrusion Prevention (Fail2ban)
+
+**Configured in**: `srv/salt/fail2ban/`, `srv/pillar/fail2ban.sls`
+
+### Active Jails
+
+| Jail | Log Source | Trigger | Ban Action |
+|------|-----------|---------|------------|
+| `sshd` | `/var/log/auth.log` | 5 failures in 10 min | UFW block |
+| `nginx-http-auth` | `/srv/wp/nginx/logs/error.log` | 5 failures in 10 min | UFW block |
+| `wp-login` | `/srv/wp/nginx/logs/access.log` | 5 failures in 10 min | UFW block |
+
+### Default Ban Settings
+
+| Setting | Value | Configurable via |
+|---------|-------|-----------------|
+| Ban duration | 3600s (1 hour) | `ban_time` in `fail2ban.sls` |
+| Find time | 600s (10 minutes) | `find_time` in `fail2ban.sls` |
+| Max retries | 5 | `max_retry` in `fail2ban.sls` |
+| Ban action | `ufw` | Integrated with host firewall |
+
+### wp-login Filter
+
+Custom Fail2ban filter matching brute-force attempts against WordPress login:
+
+- Matches `POST /wp-login.php` with HTTP 401/403/429/500 responses
+- Also matches `POST /xmlrpc.php` (common attack vector)
+- Bans via UFW — blocked at the firewall level, not just Nginx
+
+---
+
+## Secrets Encryption (SOPS + age)
+
+**Configured in**: `srv/salt/sops/`, `srv/pillar/secrets.sls`
+
+### How It Works
+
+1. **age** keypair generated at deploy time (private key stays on server)
+2. **SOPS** encrypts `secrets.sls` using the age public key
+3. Encrypted file is safe to commit to git
+4. Salt renders decrypted content in-memory at `state.apply` time
+
+### Tools Provided
+
+| Command | Purpose |
+|---------|---------|
+| `wp-secrets encrypt` | Encrypt `secrets.sls` |
+| `wp-secrets decrypt` | Decrypt for editing |
+| `wp-secrets view` | View decrypted contents |
+| `wp-secrets status` | Check encryption status |
+| `wp-secrets pubkey` | Show age public key |
+
+---
+
+## Container Auto-Updates
+
+**Configured in**: `srv/salt/autoupdate/`, `srv/pillar/autoupdate.sls`
+
+All containers carry `--label io.containers.autoupdate=registry`. A daily systemd timer runs `podman auto-update` which:
+
+1. Checks registries for newer image versions
+2. Pulls and recreates containers with the new image
+3. Monitors health checks for 60 seconds
+4. **Auto-rolls back** to the previous image if health checks fail
+
+Old images are pruned after each run.
+
+---
+
+## WordPress Maintenance
+
+**Configured in**: `srv/salt/wp_maintenance/`, `srv/pillar/wp_maintenance.sls`
+
+Daily automated WP-CLI tasks at 03:30:
+
+| Task | Purpose |
+|------|---------|
+| Core update | Latest WordPress version |
+| Plugin updates | All active plugins (with exclude list) |
+| Theme updates | All installed themes |
+| DB optimization | `wp db optimize` |
+| Transient cleanup | Remove expired transients |
+| Rewrite flush | Ensure permalink rules are current |
+
+Runs entirely within containers via the WP-CLI wrapper. Does not touch SSH, firewall, or system configuration.
+
+---
+
 ## File Permissions
 
 **Configured in**: various Salt states
@@ -489,23 +614,30 @@ This blocks access to `.htaccess`, `.env`, `.git`, and any other hidden files.
 |------|-----|------------|
 | **Single MySQL** | No replication or failover | High — database is a single point of failure |
 | **Single Redis** | No Sentinel or Cluster | Medium — cache loss causes performance degradation |
-| **No automated backups** | Only manual backup scripts documented | High — data loss risk without offsite backups |
-| **No monitoring** | No metrics, alerting, or dashboards | Medium — issues go undetected until user reports |
-| **Secrets in plaintext** | Pillar files contain unencrypted passwords | Medium — file read = full credential exposure |
-| **No rate limiting** | Nginx does not rate-limit requests | Low — Anubis mitigates bot floods, but not targeted abuse |
+| **No alerting** | Prometheus has no Alertmanager — no push notifications | Medium — issues only visible when checking Grafana |
 | **No WAF** | No ModSecurity / Coraza | Medium — no application-layer attack detection |
-| **No intrusion detection** | No file integrity monitoring | Medium — compromised files may go unnoticed |
 | **No audit logging** | WordPress admin actions not logged | Low — no forensic trail for admin changes |
+
+### Addressed Gaps (Completed)
+
+| Area | Solution | Implemented |
+|------|----------|------------|
+| Automated backups | Daily MySQL, uploads, config, Redis snapshots with rotation | `backup` state |
+| Monitoring | Prometheus + Grafana with Node, MySQL, Redis, Nginx dashboards | `prometheus`, `exporters`, `grafana` states |
+| Secrets encryption | SOPS + age encryption for secrets at rest | `sops` state |
+| Rate limiting | Nginx request/connection limits + wp-login brute-force protection | `nginx` state |
+| Intrusion prevention | Fail2ban with SSH, Nginx, WP login jails (UFW bans) | `fail2ban` state |
+| UFW SSH rate limiting | `ufw limit` for SSH brute-force protection | `security` state |
+| Container updates | Podman auto-update with health-check rollback | `autoupdate` state |
+| WordPress maintenance | WP-CLI core/plugin/theme updates, DB optimization | `wp_maintenance` state |
 
 ### Recommended Next Steps (Priority Order)
 
-1. **Automated offsite backups** — daily MySQL dumps + file sync to S3/B2, with restore testing
-2. **Prometheus + Grafana** — container metrics, Nginx stub status, MySQL/Redis exporters
-3. **MySQL replication** — add a read replica for failover and read scaling
+1. **Prometheus Alertmanager** — email/Slack notifications for critical alerts
+2. **MySQL replication** — add a read replica for failover and read scaling
+3. **Loki + Promtail** — centralized logging in Grafana alongside metrics
 4. **Varnish or FastCGI cache** — full-page caching to reduce PHP load
-5. **SOPS or age encryption** — encrypt `secrets.sls` at rest in the git repo
-6. **CrowdSec** — collaborative IP reputation with Podman support
-7. **ModSecurity / Coraza WAF** — OWASP core rule set for WordPress
-8. **Redis Sentinel** — automatic failover for the cache layer
-9. **Network segmentation** — separate Podman networks for frontend / app / data tiers
-10. **UFW rate limiting** — `ufw limit 2222/tcp` for SSH brute-force protection
+5. **CrowdSec** — collaborative IP reputation with Podman support
+6. **ModSecurity / Coraza WAF** — OWASP core rule set for WordPress
+7. **Redis Sentinel** — automatic failover for the cache layer
+8. **Network segmentation** — separate Podman networks for frontend / app / data tiers

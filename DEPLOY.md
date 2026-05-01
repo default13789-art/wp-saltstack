@@ -29,8 +29,8 @@ Complete guide for deploying the SaltStack + Rootless Podman WordPress stack.
                            │
                     ┌──────▼───────┐
                     │  Nginx (LB)  │  :80 → redirect :443
-                    │  10.89.0.2   │  :443 → TLS termination
-                    └──────┬───────┘
+                    │  10.89.0.2   │  :443 → TLS termination + rate limiting
+                    └──────┬───────┘  grafana.<domain> → Grafana proxy
                     ┌──────┴───────┐
                     │  least_conn  │
                     └──┬────────┬──┘
@@ -47,6 +47,14 @@ Complete guide for deploying the SaltStack + Rootless Podman WordPress stack.
                 │     MySQL 8.0       │  Database
                 │     10.89.0.10      │
                 └─────────────────────┘
+
+                ┌─── Monitoring Stack ───────────────┐
+                │  Prometheus    10.89.0.40:9090     │
+                │  Grafana       10.89.0.41:3000     │
+                │  Node Exporter 10.89.0.42:9100     │
+                │  MySQL Exporter 10.89.0.43:9104    │
+                │  Redis Exporter 10.89.0.44:9100    │
+                └────────────────────────────────────┘
 ```
 
 All containers run rootless under `podman-wp` (UID 1001) with user namespace mapping. The Podman bridge network `wp-network` (10.89.0.0/24) provides static internal IPs.
@@ -54,8 +62,18 @@ All containers run rootless under `podman-wp` (UID 1001) with user namespace map
 ### Service Boot Order
 
 ```
-podman setup → MySQL → Redis → WP Node 1 + WP Node 2 → Nginx
+podman setup → MySQL → Redis → WP Node 1 + WP Node 2 → Nginx → Anubis
+                                                        → Prometheus → Exporters → Grafana
 ```
+
+### Scheduled Tasks
+
+| Timer | Schedule | Purpose |
+|-------|----------|---------|
+| `wp-backup.timer` | Daily at 03:00 | MySQL dump, uploads, config, Redis snapshot |
+| `wp-maintenance.timer` | Daily at 03:30 | WP-CLI core/plugin/theme updates, DB optimize |
+| `wp-autoupdate.timer` | Daily at 04:00 | Container image updates with rollback |
+| `wp-nginx-cert-renew` | 02:00 & 14:00 | Let's Encrypt certificate renewal |
 
 Enforced via systemd `Requires=` / `After=` directives.
 
@@ -348,6 +366,12 @@ Configured in `srv/salt/map.jinja`:
 | Redis | `docker.io/library/redis:7-alpine` |
 | WordPress | `docker.io/library/wordpress:php8.2-fpm-alpine` |
 | Nginx | `docker.io/library/nginx:1.25-alpine` |
+| Anubis | `ghcr.io/techarohq/anubis:latest` |
+| Prometheus | `docker.io/prom/prometheus:latest` |
+| Grafana | `docker.io/grafana/grafana:latest` |
+| Node Exporter | `docker.io/prom/node-exporter:latest` |
+| MySQL Exporter | `docker.io/prom/mysqld-exporter:latest` |
+| Redis Exporter | `docker.io/oliver006/redis_exporter:latest` |
 
 ---
 
@@ -360,7 +384,48 @@ UID=$(id -u podman-wp)
 sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$UID podman ps -a
 ```
 
-Expected output: 5 containers (mysql, redis, wp-node1, wp-node2, nginx) all status `Up`.
+Expected output: 10 containers (mysql, redis, wp-node1, wp-node2, nginx, anubis, prometheus, grafana, node-exporter, mysql-exporter, redis-exporter) all status `Up`.
+
+### Check Monitoring Stack
+
+```bash
+# Prometheus health
+curl -f http://10.89.0.40:9090/-/healthy
+
+# Prometheus targets (all should be UP)
+curl -s http://10.89.0.40:9090/api/v1/targets | python3 -m json.tool
+
+# Grafana health
+curl -f http://10.89.0.41:3000/api/health
+
+# Access dashboards: https://grafana.<domain>
+```
+
+### Check Backup System
+
+```bash
+# Verify backup script exists
+ls -la /srv/wp/bin/backup.sh
+
+# Run a manual backup
+UID=$(id -u podman-wp)
+sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$UID systemctl --user start wp-backup
+
+# List backups
+/srv/wp/bin/backup-restore.sh list
+```
+
+### Check Fail2ban
+
+```bash
+# Verify fail2ban is running
+sudo fail2ban-client status
+
+# Check individual jails
+sudo fail2ban-client status sshd
+sudo fail2ban-client status nginx-http-auth
+sudo fail2ban-client status wp-login
+```
 
 ### Check Health Endpoints
 
@@ -611,44 +676,54 @@ $SUDO systemctl --user start container-redis container-wp-node1 container-wp-nod
 
 ## Backup & Recovery
 
-### Database Backup
+Automated daily backups are handled by the `backup` Salt state. Backups run at 03:00 (configurable via `srv/pillar/backup.sls`).
+
+### What Gets Backed Up
+
+| Component | Method | Storage |
+|-----------|--------|---------|
+| MySQL database | `mysqldump --single-transaction` | `/srv/wp/backups/db/` |
+| WordPress uploads | `tar` archive | `/srv/wp/backups/uploads/` |
+| wp-config.php | File copy | `/srv/wp/backups/config/` |
+| Redis data | `BGSAVE` snapshot | `/srv/wp/backups/redis/` |
+
+### Retention
+
+Default: 30 days (configurable via `retention_days` in `srv/pillar/backup.sls`).
+
+### Manual Backup
 
 ```bash
-# One-time dump
 UID=$(id -u podman-wp)
 sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$UID \
-    podman exec mysql mysqldump -u root -p"<password>" --single-transaction wordpress \
-    | gzip > wordpress-db-$(date +%Y%m%d).sql.gz
-```
-
-### File Backup (Uploads)
-
-```bash
-sudo tar czf wp-uploads-$(date +%Y%m%d).tar.gz /srv/wp/uploads/
-```
-
-### Automated Daily Backups (Cron)
-
-```bash
-# Add to root crontab
-sudo crontab -e
-```
-
-```cron
-# Daily DB backup at 2 AM, keep 30 days
-0 2 * * * UID=$(id -u podman-wp); sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$UID podman exec mysql mysqldump -u root -p'<PASSWORD>' --single-transaction wordpress | gzip > /srv/wp/backups/db-$(date +\%Y\%m\%d).sql.gz; find /srv/wp/backups/ -name "db-*.sql.gz" -mtime +30 -delete
+    systemctl --user start wp-backup
 ```
 
 ### Restore
 
 ```bash
-# Restore database
-gunzip < wordpress-db-YYYYMMDD.sql.gz | \
-    sudo -u podman-wp XDG_RUNTIME_DIR=/run/user/$UID \
-    podman exec -i mysql mysql -u root -p"<password>" wordpress
+# List available backups
+/srv/wp/bin/backup-restore.sh list
+
+# Restore database from a specific backup
+/srv/wp/bin/backup-restore.sh restore-db db_20260502.sql.gz
 
 # Restore uploads
-sudo tar xzf wp-uploads-YYYYMMDD.tar.gz -C /
+/srv/wp/bin/backup-restore.sh restore-uploads uploads_20260502.tar.gz
+
+# Restore wp-config
+/srv/wp/bin/backup-restore.sh restore-config wp-config_20260502.php
+```
+
+### Offsite Backup (Optional)
+
+Enable in `srv/pillar/backup.sls`:
+
+```yaml
+offsite_enabled: true
+offsite_type: rsync
+offsite_target: user@backup-server:/backups/wp/
+offsite_rsync_key: /home/podman-wp/.ssh/backup_key
 ```
 
 ---
@@ -708,20 +783,36 @@ sudo mount -t nfs4 nfs-server:/exports/wp-uploads /srv/wp/uploads
 wpadmin/
 ├── install.sh              ← Automatic installer
 ├── DEPLOY.md               ← This guide
-├── CLAUDE.md               ← Architecture reference
+├── SECURITY.md             ← Security reference
 └── srv/
     ├── pillar/
     │   ├── top.sls         ← Pillar mapping
     │   ├── secrets.sls     ← Passwords & salts (GENERATE FRESH!)
     │   ├── network.sls     ← IPs, ports, domain
-    │   └── users.sls       ← Podman user config
+    │   ├── users.sls       ← Podman user config
+    │   ├── backup.sls      ← Backup schedule and retention
+    │   ├── fail2ban.sls    ← Intrusion prevention settings
+    │   ├── monitoring_grafana.sls  ← Monitoring stack config
+    │   ├── autoupdate.sls  ← Container update schedule
+    │   └── wp_maintenance.sls      ← WP-CLI automation config
     └── salt/
         ├── top.sls         ← Role → state mapping
         ├── map.jinja       ← Central variable lookup
-        ├── security/       ← UFW + SSH hardening
+        ├── security/       ← UFW + SSH hardening + rate limiting
         ├── podman/         ← Podman install + user + network
         ├── mysql/          ← MySQL 8.0 container
         ├── redis/          ← Redis 7 container
-        ├── wordpress/      ← 2x PHP-FPM nodes + wp-config
-        └── nginx/          ← Load balancer + SSL
+        ├── wordpress/      ← 2x PHP-FPM nodes + wp-config + WP-CLI
+        ├── nginx/          ← Load balancer + SSL + Grafana proxy + rate limiting
+        ├── anubis/         ← Bot protection
+        ├── monitoring/     ← Beacons + reactors
+        ├── prometheus/     ← Metrics collection
+        ├── exporters/      ← Node, MySQL, Redis exporters
+        ├── grafana/        ← Dashboards + auto-provisioning
+        ├── backup/         ← Automated backups + restore
+        ├── fail2ban/       ← SSH, Nginx, WP login jails
+        ├── logrotate/      ← Log rotation
+        ├── sops/           ← Secrets encryption
+        ├── autoupdate/     ← Container auto-update timer
+        └── wp_maintenance/ ← WP-CLI update/optimization timer
 ```
