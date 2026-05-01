@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PODMAN_USER="{{ podman_user }}"
+PODMAN_UID="{{ podman_uid }}"
+BACKUP_DIR="{{ backup_dir }}"
+LOG_FILE="{{ log_dir }}/backup.log"
+
+SUDO_PODMAN="sudo -u $PODMAN_USER env XDG_RUNTIME_DIR=/run/user/$PODMAN_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$PODMAN_UID/bus HOME=/home/$PODMAN_USER"
+
+usage() {
+    echo "Usage: $0 <command> [args]"
+    echo ""
+    echo "Commands:"
+    echo "  list                  List available backups"
+    echo "  restore-db <file>     Restore MySQL from .sql.gz file"
+    echo "  restore-uploads <file> Restore uploads from .tar.gz file"
+    echo "  restore-config <file> Restore wp-config.php from backup file"
+    echo ""
+    echo "Files are relative to $BACKUP_DIR"
+    exit 1
+}
+
+[ $# -lt 1 ] && usage
+
+case "$1" in
+    list)
+        echo "=== MySQL backups ==="
+        ls -lh "$BACKUP_DIR/mysql/" 2>/dev/null || echo "(none)"
+        echo ""
+        echo "=== Uploads backups ==="
+        ls -lh "$BACKUP_DIR/uploads/" 2>/dev/null || echo "(none)"
+        echo ""
+        echo "=== Config backups ==="
+        ls -lh "$BACKUP_DIR/config/" 2>/dev/null || echo "(none)"
+        echo ""
+        echo "=== Redis snapshots ==="
+        ls -lh "$BACKUP_DIR/redis/" 2>/dev/null || echo "(none)"
+        ;;
+    restore-db)
+        [ -z "${2:-}" ] && { echo "Error: specify backup file (e.g., mysql/wordpress_20240101_030000.sql.gz)"; exit 1; }
+        FILE="$BACKUP_DIR/$2"
+        [ ! -f "$FILE" ] && { echo "Error: $FILE not found"; exit 1; }
+        echo "Restoring database from $FILE ..."
+        gunzip -c "$FILE" | $SUDO_PODMAN podman exec -i mysql mysql -u root -p"{{ mysql_root_pass }}" "{{ mysql_wp_db }}"
+        echo "Done. Database restored."
+        ;;
+    restore-uploads)
+        [ -z "${2:-}" ] && { echo "Error: specify backup file (e.g., uploads/uploads_20240101_030000.tar.gz)"; exit 1; }
+        FILE="$BACKUP_DIR/$2"
+        [ ! -f "$FILE" ] && { echo "Error: $FILE not found"; exit 1; }
+        echo "Restoring uploads from $FILE ..."
+        tar xzf "$FILE" -C "{{ uploads_dir }}/"
+        echo "Done. Uploads restored."
+        ;;
+    restore-config)
+        [ -z "${2:-}" ] && { echo "Error: specify backup file (e.g., config/wp-config_20240101_030000.php)"; exit 1; }
+        FILE="$BACKUP_DIR/$2"
+        [ ! -f "$FILE" ] && { echo "Error: $FILE not found"; exit 1; }
+        echo "Restoring wp-config.php from $FILE ..."
+        cp -p "$FILE" "{{ wp_config_dir }}/wp-config.php"
+        echo "Done. Config restored."
+        ;;
+    *)
+        usage
+        ;;
+esac

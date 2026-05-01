@@ -5,3 +5,4 @@ base:
     - redis
     - secrets
     - monitoring
+    - backup

@@ -1,0 +1,6 @@
+[Unit]
+Description=WordPress Full Backup
+
+[Service]
+Type=oneshot
+ExecStart={{ wp_bin }}/backup.sh

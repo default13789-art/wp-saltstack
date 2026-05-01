@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PODMAN_USER="{{ podman_user }}"
+PODMAN_UID="{{ podman_uid }}"
+BACKUP_DIR="{{ backup_dir }}"
+RETENTION_DAYS="{{ retention_days }}"
+LOG_FILE="{{ log_dir }}/backup.log"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+log() { echo "$(date -Iseconds) $*" >> "$LOG_FILE"; }
+
+# Ensure backup dirs exist
+mkdir -p "$BACKUP_DIR"/{mysql,uploads,config,redis}
+
+SUDO_PODMAN="sudo -u $PODMAN_USER env XDG_RUNTIME_DIR=/run/user/$PODMAN_UID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$PODMAN_UID/bus HOME=/home/$PODMAN_USER"
+
+# --- MySQL dump ---
+if $SUDO_PODMAN podman exec mysql mysqladmin ping -u root -p"{{ mysql_root_pass }}" --silent 2>/dev/null; then
+    $SUDO_PODMAN podman exec mysql mysqldump -u root -p"{{ mysql_root_pass }}" \
+        --single-transaction --routines --triggers "{{ mysql_wp_db }}" \
+        | gzip > "$BACKUP_DIR/mysql/{{ mysql_wp_db }}_${TIMESTAMP}.sql.gz" 2>/dev/null \
+    && log "INFO MySQL backup OK: {{ mysql_wp_db }}_${TIMESTAMP}.sql.gz" \
+    || log "WARN MySQL backup FAILED"
+else
+    log "WARN MySQL not running, skipping DB backup"
+fi
+
+# --- WordPress uploads ---
+if [ -d "{{ uploads_dir }}" ]; then
+    tar czf "$BACKUP_DIR/uploads/uploads_${TIMESTAMP}.tar.gz" -C "{{ uploads_dir }}" . 2>/dev/null \
+    && log "INFO Uploads backup OK: uploads_${TIMESTAMP}.tar.gz" \
+    || log "WARN Uploads backup FAILED"
+fi
+
+# --- wp-config.php ---
+if [ -f "{{ wp_config_dir }}/wp-config.php" ]; then
+    cp -p "{{ wp_config_dir }}/wp-config.php" "$BACKUP_DIR/config/wp-config_${TIMESTAMP}.php" \
+    && log "INFO Config backup OK" \
+    || log "WARN Config backup FAILED"
+fi
+
+# --- Redis RDB snapshot ---
+REDIS_DUMP="{{ redis_data }}/dump.rdb"
+if [ -f "$REDIS_DUMP" ]; then
+    cp -p "$REDIS_DUMP" "$BACKUP_DIR/redis/dump_${TIMESTAMP}.rdb" \
+    && log "INFO Redis snapshot backup OK" \
+    || log "WARN Redis snapshot backup FAILED"
+fi
+
+# --- Rotation ---
+find "$BACKUP_DIR/mysql" -name "*.sql.gz" -mtime +$RETENTION_DAYS -delete 2>/dev/null
+find "$BACKUP_DIR/uploads" -name "*.tar.gz" -mtime +$RETENTION_DAYS -delete 2>/dev/null
+find "$BACKUP_DIR/config" -name "wp-config_*" -mtime +$RETENTION_DAYS -delete 2>/dev/null
+find "$BACKUP_DIR/redis" -name "dump_*" -mtime +$RETENTION_DAYS -delete 2>/dev/null
+log "INFO Rotation complete (keep $RETENTION_DAYS days)"
+
+# --- Offsite sync ---
+{% if offsite_enabled %}
+if [ -n "{{ offsite_target }}" ]; then
+    {% if offsite_type == 'rsync' %}
+    rsync -az --delete \
+        {% if offsite_rsync_key %}-e "ssh -i {{ offsite_rsync_key }} -o StrictHostKeyChecking=no"{% endif %} \
+        "$BACKUP_DIR/" "{{ offsite_target }}" \
+    && log "INFO Offsite rsync OK" \
+    || log "WARN Offsite rsync FAILED"
+    {% endif %}
+fi
+{% endif %}
+
+log "INFO Backup run finished"

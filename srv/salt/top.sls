@@ -8,6 +8,7 @@ base:
     - podman
     - mysql
     - monitoring
+    - backup
 
   'role:cache':
     - match: grain
@@ -20,6 +21,7 @@ base:
     - podman
     - wordpress
     - monitoring
+    - backup
 
   'role:lb':
     - match: grain
@@ -38,3 +40,4 @@ base:
     - anubis
     - security
     - monitoring
+    - backup

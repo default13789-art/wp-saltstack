@@ -3,6 +3,7 @@
 {% set redis_pillar = salt['pillar.get']('redis', {}) %}
 {% set secrets = salt['pillar.get']('secrets', {}) %}
 {% set monitoring = salt['pillar.get']('monitoring', {}) %}
+{% set backup = salt['pillar.get']('backup', {}) %}
 
 {% set settings = {
     'podman_user':      users.get('podman_user', 'podman-wp'),
@@ -68,4 +69,13 @@
     'watch_paths':         monitoring.get('watch_paths', {}),
     'container_services':  monitoring.get('container_services', {}),
     'alert_log':           monitoring.get('alert_log', '/var/log/wp/beacon-alerts.log'),
+    'backup_dir':          backup.get('backup_dir', '/srv/wp/backups'),
+    'backup_log_dir':      backup.get('log_dir', '/var/log/wp'),
+    'retention_days':      backup.get('retention_days', 30),
+    'schedule_hour':       backup.get('schedule_hour', 3),
+    'schedule_minute':     backup.get('schedule_minute', 0),
+    'offsite_enabled':     backup.get('offsite_enabled', false),
+    'offsite_type':        backup.get('offsite_type', 'rsync'),
+    'offsite_target':      backup.get('offsite_target', ''),
+    'offsite_rsync_key':   backup.get('offsite_rsync_key', ''),
 } %}

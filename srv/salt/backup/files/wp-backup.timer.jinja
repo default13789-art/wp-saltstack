@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily WordPress Backup Timer
+
+[Timer]
+OnCalendar=*-*-* {{ '%02d' % schedule_hour }}:{{ '%02d' % schedule_minute }}:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
