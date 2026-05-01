@@ -2,6 +2,7 @@
 {% set network = salt['pillar.get']('network', {}) %}
 {% set redis_pillar = salt['pillar.get']('redis', {}) %}
 {% set secrets = salt['pillar.get']('secrets', {}) %}
+{% set monitoring = salt['pillar.get']('monitoring', {}) %}
 
 {% set settings = {
     'podman_user':      users.get('podman_user', 'podman-wp'),
@@ -60,4 +61,11 @@
     'packages': {
         'podman':       ['podman'],
     },
+    'disk_warning':        monitoring.get('disk_warning', 80),
+    'disk_critical':       monitoring.get('disk_critical', 90),
+    'disk_paths':          monitoring.get('disk_paths', ['/', '/srv/wp']),
+    'beacon_interval':     monitoring.get('beacon_interval', 60),
+    'watch_paths':         monitoring.get('watch_paths', {}),
+    'container_services':  monitoring.get('container_services', {}),
+    'alert_log':           monitoring.get('alert_log', '/var/log/wp/beacon-alerts.log'),
 } %}

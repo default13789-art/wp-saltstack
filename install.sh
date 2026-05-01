@@ -682,6 +682,13 @@ file_roots:
 pillar_roots:
   base:
     - '${salt_base}/pillar'
+reactor:
+  - 'salt/beacon/*/diskusage/*':
+    - ${REPO_DIR}/srv/salt/reactor/disk-cleanup
+  - 'salt/beacon/*/inotify/*':
+    - ${REPO_DIR}/srv/salt/reactor/config-change-alert
+  - 'salt/beacon/*/cmd/*':
+    - ${REPO_DIR}/srv/salt/reactor/container-health-check
 EOF
 
     info "Salt configured for masterless mode."
@@ -706,6 +713,13 @@ pillar_roots:
   base:
     - '${salt_base}/pillar'
 auto_accept: True
+reactor:
+  - 'salt/beacon/*/diskusage/*':
+    - ${REPO_DIR}/srv/salt/reactor/disk-cleanup
+  - 'salt/beacon/*/inotify/*':
+    - ${REPO_DIR}/srv/salt/reactor/config-change-alert
+  - 'salt/beacon/*/cmd/*':
+    - ${REPO_DIR}/srv/salt/reactor/container-health-check
 EOF
 
         systemctl enable salt-master

@@ -4,3 +4,4 @@ base:
     - network
     - redis
     - secrets
+    - monitoring

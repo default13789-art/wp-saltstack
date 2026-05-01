@@ -1,0 +1,20 @@
+#!/bin/bash
+# Managed by Salt - checks systemd user service status for container services
+# Outputs "SERVICE_NAME:STATUS" for any non-active service
+set -euo pipefail
+
+PODMAN_USER="{{ podman_user }}"
+PODMAN_UID="{{ podman_uid }}"
+RUNTIME_DIR="/run/user/${PODMAN_UID}"
+BUS_ADDR="unix:path=${RUNTIME_DIR}/bus"
+
+{% for svc in container_services %}
+status=$(sudo -u "${PODMAN_USER}" \
+  XDG_RUNTIME_DIR="${RUNTIME_DIR}" \
+  DBUS_SESSION_BUS_ADDRESS="${BUS_ADDR}" \
+  systemctl --user is-active {{ svc }} 2>/dev/null || echo "unknown")
+
+if [ "${status}" != "active" ]; then
+  echo "{{ svc }}:${status}"
+fi
+{% endfor %}

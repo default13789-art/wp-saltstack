@@ -1,0 +1,29 @@
+# Managed by Salt - do not edit
+beacons:
+  diskusage:
+    {% for path in disk_paths %}
+    - path: {{ path }}
+      percent: {{ disk_critical }}
+    {% endfor %}
+    interval: {{ beacon_interval }}
+
+  {% if watch_paths %}
+  inotify:
+    {% for path in watch_paths %}
+    - path: {{ path }}
+      mask:
+        - modify
+        - create
+        - delete
+        - attrib
+    {% endfor %}
+    interval: {{ beacon_interval }}
+    disable_during_state_run: True
+  {% endif %}
+
+  {% if container_services %}
+  cmd:
+    - name: /usr/local/bin/wp-container-health-check.sh
+    - shell: /bin/bash
+    interval: {{ beacon_interval }}
+  {% endif %}
