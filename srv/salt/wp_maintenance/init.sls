@@ -38,7 +38,7 @@ wp-maintenance-timer:
     - template: jinja
     - context:
         hour: {{ settings.wp_maint_hour }}
-        minute: {{ settings.wp_maint_minute|string|pad(2, '0') }}
+        minute: {{ '%02d' | format(settings.wp_maint_minute) }}
     - mode: '0644'
 
 wp-maintenance-daemon-reload:

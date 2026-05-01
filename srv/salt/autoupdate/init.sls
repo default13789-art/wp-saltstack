@@ -25,7 +25,7 @@ autoupdate-timer:
     - template: jinja
     - context:
         hour: {{ settings.autoupdate_hour }}
-        minute: {{ settings.autoupdate_minute|string|pad(2, '0') }}
+        minute: {{ '%02d' | format(settings.autoupdate_minute) }}
     - user: {{ u }}
     - group: {{ u }}
     - mode: '0644'
