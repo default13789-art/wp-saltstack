@@ -3,6 +3,7 @@ base:
     - match: grain
     - security
     - fail2ban
+    - logrotate
 
   'role:db':
     - match: grain
@@ -10,12 +11,14 @@ base:
     - mysql
     - monitoring
     - backup
+    - logrotate
 
   'role:cache':
     - match: grain
     - podman
     - redis
     - monitoring
+    - logrotate
 
   'role:app':
     - match: grain
@@ -23,6 +26,7 @@ base:
     - wordpress
     - monitoring
     - backup
+    - logrotate
 
   'role:lb':
     - match: grain
@@ -30,6 +34,7 @@ base:
     - nginx
     - anubis
     - monitoring
+    - logrotate
 
   'role:all-in-one':
     - match: grain
@@ -43,3 +48,4 @@ base:
     - monitoring
     - backup
     - fail2ban
+    - logrotate

@@ -1,0 +1,37 @@
+{{ log_dir }}/beacon-alerts.log {
+    weekly
+    rotate 4
+    maxsize 100M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+}
+
+{{ log_dir }}/backup.log {
+    weekly
+    rotate 4
+    maxsize 100M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+}
+
+{{ nginx_logs }}/*.log {
+    weekly
+    rotate 4
+    maxsize 100M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        sudo -u {{ podman_user }} XDG_RUNTIME_DIR=/run/user/{{ podman_uid }} \
+          DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{{ podman_uid }}/bus \
+          podman exec nginx nginx -s reopen 2>/dev/null || true
+    endscript
+}
