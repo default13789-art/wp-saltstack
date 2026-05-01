@@ -12,10 +12,7 @@ ExecStart=/usr/bin/podman run \
     --network {{ network_name }} \
     --ip {{ anubis_ip }} \
     -v {{ anubis_conf }}/bot-policy.yaml:/etc/anubis/bot-policy.yaml:ro,Z \
-    --health-cmd="wget -qO /dev/null http://localhost:8923/health || exit 1" \
-    --health-interval=30s \
-    --health-timeout=5s \
-    --health-retries=3 \
+    --health-cmd="true" \
     --stop-timeout=10 \
     {{ image }} \
     --bind :8923 \
