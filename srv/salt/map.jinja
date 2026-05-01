@@ -6,6 +6,7 @@
 {% set backup = salt['pillar.get']('backup', {}) %}
 {% set fail2ban = salt['pillar.get']('fail2ban', {}) %}
 {% set mon = salt['pillar.get']('monitoring_grafana', {}) %}
+{% set autoupdate = salt['pillar.get']('autoupdate', {}) %}
 
 {% set settings = {
     'podman_user':      users.get('podman_user', 'podman-wp'),
@@ -110,4 +111,9 @@
     'retention_time':      mon.get('retention_time', '15d'),
     'prometheus_data':     network.get('prometheus_data', '/srv/wp/prometheus/data'),
     'grafana_data':        network.get('grafana_data', '/srv/wp/grafana/data'),
+    'autoupdate_enabled':  autoupdate.get('enable', true),
+    'autoupdate_schedule': autoupdate.get('schedule', 'daily'),
+    'autoupdate_hour':     autoupdate.get('schedule_hour', 4),
+    'autoupdate_minute':   autoupdate.get('schedule_minute', 0),
+    'autoupdate_cleanup':  autoupdate.get('cleanup_images', true),
 } %}

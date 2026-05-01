@@ -8,3 +8,4 @@ base:
     - backup
     - fail2ban
     - monitoring_grafana
+    - autoupdate
