@@ -88,6 +88,8 @@ Enforced via systemd `Requires=` / `After=` directives.
 
 ---
 
+create an user with sudo | cause the script remove ssh script 
+
 ## Quick Start — Single Node
 
 Deploy everything on one server in under 10 minutes.
