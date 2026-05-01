@@ -1,0 +1,12 @@
+bots:
+  - name: allow-search-engines
+    action: ALLOW
+    user_agent_regex: "Googlebot|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebookexternalhit|Twitterbot|LinkedInBot"
+
+  - name: block-known-bad
+    action: DENY
+    user_agent_regex: "SemrushBot|AhrefsBot|MJ12bot|DotBot|SeznamBot|python-requests|Go-http-client|httpclient"
+
+  - name: challenge-unknown
+    action: CHALLENGE
+    user_agent_regex: ".*"

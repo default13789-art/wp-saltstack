@@ -51,6 +51,7 @@ nginx-conf:
         domain: {{ settings.domain }}
         wp_node1_ip: {{ settings.wp_node1_ip }}
         wp_node2_ip: {{ settings.wp_node2_ip }}
+        anubis_ip: {{ settings.anubis_ip }}
     - user: {{ u }}
     - group: {{ u }}
     - mode: '0644'

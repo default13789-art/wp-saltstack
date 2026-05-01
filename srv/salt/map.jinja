@@ -23,6 +23,7 @@
     'wp_node1_ip':      network.get('wp_node1_ip', '10.89.0.31'),
     'wp_node2_ip':      network.get('wp_node2_ip', '10.89.0.32'),
     'nginx_ip':         network.get('nginx_ip', '10.89.0.2'),
+    'anubis_ip':        network.get('anubis_ip', '10.89.0.5'),
     'http_port':        network.get('http_port', 80),
     'https_port':       network.get('https_port', 443),
     'external_interface': network.get('external_interface', 'eth0'),
@@ -54,6 +55,7 @@
         'redis':        'docker.io/library/redis:7-alpine',
         'wordpress':    'docker.io/library/wordpress:php8.2-fpm-alpine',
         'nginx':        'docker.io/library/nginx:1.25-alpine',
+        'anubis':       'ghcr.io/techarohq/anubis:latest',
     },
     'packages': {
         'podman':       ['podman'],

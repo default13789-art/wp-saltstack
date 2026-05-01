@@ -12,6 +12,7 @@ network:
   wp_node1_ip: 10.89.0.31
   wp_node2_ip: 10.89.0.32
   nginx_ip: 10.89.0.2
+  anubis_ip: 10.89.0.5
 
   http_port: 80
   https_port: 443

@@ -22,6 +22,7 @@ base:
     - match: grain
     - podman
     - nginx
+    - anubis
 
   'role:all-in-one':
     - match: grain
@@ -30,4 +31,5 @@ base:
     - redis
     - wordpress
     - nginx
+    - anubis
     - security

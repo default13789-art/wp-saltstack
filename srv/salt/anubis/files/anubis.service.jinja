@@ -1,0 +1,32 @@
+[Unit]
+Description=Anubis Bot Protection Container (Podman)
+After=container-nginx.service
+Requires=container-nginx.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f anubis
+ExecStart=/usr/bin/podman run \
+    --name anubis \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ anubis_ip }} \
+    -v {{ anubis_conf }}/bot-policy.yaml:/etc/anubis/bot-policy.yaml:ro,Z \
+    --health-cmd="wget -qO /dev/null http://localhost:8923/health || exit 1" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=10 \
+    {{ image }} \
+    --bind :8923 \
+    --target http://{{ nginx_ip }}:8080 \
+    --policy-fname /etc/anubis/bot-policy.yaml \
+    --difficulty 4 \
+    --cookie-secure \
+    --serve-robots-txt
+ExecStop=/usr/bin/podman stop -t 10 anubis
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

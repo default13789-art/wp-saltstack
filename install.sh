@@ -884,6 +884,13 @@ EOSQL
     "${SUDO[@]}" systemctl --user start container-nginx 2>/dev/null || warn "Failed to start Nginx."
     sleep 3
 
+    info "Pulling Anubis image..."
+    "${SUDO[@]}" podman pull ghcr.io/techarohq/anubis:latest 2>/dev/null || warn "Anubis image pull failed (will retry on start)."
+
+    info "Starting Anubis..."
+    "${SUDO[@]}" systemctl --user start container-anubis 2>/dev/null || warn "Failed to start Anubis."
+    sleep 10
+
     cd "${REPO_DIR:-/root}"
 
     info "All containers started."
@@ -925,6 +932,12 @@ verify() {
         info "  Nginx health: OK"
     else
         warn "  Nginx health: not responding (may need a few more seconds)"
+    fi
+
+    if "${SUDO[@]}" podman exec anubis wget -qO /dev/null http://localhost:8923/health 2>/dev/null; then
+        info "  Anubis health: OK"
+    else
+        warn "  Anubis health: not responding yet"
     fi
 
     if curl -sf -k -o /dev/null "https://localhost" 2>&1; then
