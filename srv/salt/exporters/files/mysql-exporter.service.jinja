@@ -1,0 +1,25 @@
+[Unit]
+Description=MySQL Exporter Container (Podman)
+After=container-mysql.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f mysql-exporter
+ExecStart=/usr/bin/podman run \
+    --name mysql-exporter \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ mysql_exporter_ip }} \
+    -e DATA_SOURCE_NAME="{{ mysql_user }}:{{ mysql_pass }}@({{ mysql_ip }}:3306)/" \
+    --health-cmd="wget -qO /dev/null http://localhost:9104/metrics || exit 1" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=10 \
+    {{ image }}
+ExecStop=/usr/bin/podman stop -t 10 mysql-exporter
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

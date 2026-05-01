@@ -1,0 +1,30 @@
+[Unit]
+Description=Node Exporter Container (Podman)
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f node-exporter
+ExecStart=/usr/bin/podman run \
+    --name node-exporter \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ node_exporter_ip }} \
+    -v /proc:/host/proc:ro \
+    -v /sys:/host/sys:ro \
+    -v /:/rootfs:ro \
+    --health-cmd="wget -qO /dev/null http://localhost:9100/metrics || exit 1" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=10 \
+    {{ image }} \
+    --path.procfs=/host/proc \
+    --path.sysfs=/host/sys \
+    --path.rootfs=/rootfs \
+    --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+ExecStop=/usr/bin/podman stop -t 10 node-exporter
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

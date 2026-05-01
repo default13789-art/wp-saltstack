@@ -1,0 +1,26 @@
+[Unit]
+Description=Redis Exporter Container (Podman)
+After=container-redis.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f redis-exporter
+ExecStart=/usr/bin/podman run \
+    --name redis-exporter \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ redis_exporter_ip }} \
+    -e REDIS_ADDR=redis://{{ redis_ip }}:6379 \
+    -e REDIS_PASSWORD={{ redis_password }} \
+    --health-cmd="wget -qO /dev/null http://localhost:9100/metrics || exit 1" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=10 \
+    {{ image }}
+ExecStop=/usr/bin/podman stop -t 10 redis-exporter
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
