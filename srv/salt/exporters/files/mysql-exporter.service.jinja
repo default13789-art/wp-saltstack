@@ -8,6 +8,7 @@ ExecStartPre=-/usr/bin/podman rm -f mysql-exporter
 ExecStart=/usr/bin/podman run \
     --name mysql-exporter \
     --rm \
+    --user 0 \
     --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ mysql_exporter_ip }} \
