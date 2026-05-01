@@ -7,3 +7,4 @@ base:
     - monitoring
     - backup
     - fail2ban
+    - monitoring_grafana

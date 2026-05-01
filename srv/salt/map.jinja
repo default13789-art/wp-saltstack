@@ -5,6 +5,7 @@
 {% set monitoring = salt['pillar.get']('monitoring', {}) %}
 {% set backup = salt['pillar.get']('backup', {}) %}
 {% set fail2ban = salt['pillar.get']('fail2ban', {}) %}
+{% set mon = salt['pillar.get']('monitoring_grafana', {}) %}
 
 {% set settings = {
     'podman_user':      users.get('podman_user', 'podman-wp'),
@@ -59,6 +60,11 @@
         'wordpress':    'docker.io/library/wordpress:php8.2-fpm-alpine',
         'nginx':        'docker.io/library/nginx:1.25-alpine',
         'anubis':       'ghcr.io/techarohq/anubis:latest',
+        'prometheus':   'docker.io/prom/prometheus:latest',
+        'grafana':      'docker.io/grafana/grafana:latest',
+        'node_exporter': 'docker.io/prom/node-exporter:latest',
+        'mysql_exporter': 'docker.io/prom/mysqld-exporter:latest',
+        'redis_exporter': 'docker.io/oliver006/redis_exporter:latest',
     },
     'packages': {
         'podman':       ['podman'],
@@ -93,4 +99,15 @@
     'age_version':         '1.2.0',
     'sops_secrets_file':   '/opt/wpadmin/srv/pillar/secrets.sls',
     'sops_config_file':    '/opt/wpadmin/.sops.yaml',
+    'prometheus_ip':       mon.get('prometheus_ip', '10.89.0.40'),
+    'grafana_ip':          mon.get('grafana_ip', '10.89.0.41'),
+    'node_exporter_ip':    mon.get('node_exporter_ip', '10.89.0.42'),
+    'mysql_exporter_ip':   mon.get('mysql_exporter_ip', '10.89.0.43'),
+    'redis_exporter_ip':   mon.get('redis_exporter_ip', '10.89.0.44'),
+    'grafana_admin_password': mon.get('grafana_admin_password', 'changeme'),
+    'scrape_interval':     mon.get('scrape_interval', '15s'),
+    'evaluation_interval': mon.get('evaluation_interval', '15s'),
+    'retention_time':      mon.get('retention_time', '15d'),
+    'prometheus_data':     network.get('prometheus_data', '/srv/wp/prometheus/data'),
+    'grafana_data':        network.get('grafana_data', '/srv/wp/grafana/data'),
 } %}
