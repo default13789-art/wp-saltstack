@@ -35,6 +35,9 @@ base:
     - nginx
     - anubis
     - monitoring
+    - prometheus
+    - exporters
+    - grafana
     - logrotate
 
   'role:all-in-one':
@@ -49,5 +52,8 @@ base:
     - monitoring
     - backup
     - fail2ban
+    - prometheus
+    - exporters
+    - grafana
     - logrotate
     - sops
