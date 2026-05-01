@@ -41,10 +41,10 @@ ufw-defaults-default-forward:
     - require:
       - pkg: ufw-pkg
 
-ufw-allow-ssh:
+ufw-limit-ssh:
   cmd.run:
-    - name: ufw allow {{ settings.ssh_port }}/tcp
-    - unless: 'ufw status | grep -q "^{{ settings.ssh_port }}/tcp"'
+    - name: ufw limit {{ settings.ssh_port }}/tcp
+    - unless: 'ufw status | grep -q "{{ settings.ssh_port }}/tcp"'
     - require:
       - file: ufw-config
 
@@ -67,7 +67,7 @@ ufw-enable:
     - name: ufw --force enable
     - unless: 'ufw status | grep -q "Status: active"'
     - require:
-      - cmd: ufw-allow-ssh
+      - cmd: ufw-limit-ssh
       - cmd: ufw-allow-http
       - cmd: ufw-allow-https
 
