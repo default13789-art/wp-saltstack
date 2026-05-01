@@ -1,0 +1,67 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{ "expr": "100 - (avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } }
+    },
+    {
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes", "legendFormat": "Used" },
+        { "expr": "node_memory_MemAvailable_bytes", "legendFormat": "Available" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "Disk Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"}", "legendFormat": "Available /" },
+        { "expr": "node_filesystem_size_bytes{mountpoint=\"/\"} - node_filesystem_avail_bytes{mountpoint=\"/\"}", "legendFormat": "Used /" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "title": "Network I/O",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "Recv {{device}}" },
+        { "expr": "rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "Sent {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" } }
+    },
+    {
+      "title": "Load Average",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "targets": [{ "expr": "node_load1", "legendFormat": "1m" }]
+    },
+    {
+      "title": "Uptime",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+      "targets": [{ "expr": "time() - node_boot_time_seconds", "legendFormat": "seconds" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["node", "infrastructure"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Node Overview",
+  "uid": "node-overview",
+  "version": 1
+}

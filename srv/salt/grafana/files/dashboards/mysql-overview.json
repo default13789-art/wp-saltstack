@@ -1,0 +1,64 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "title": "MySQL Connections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "mysql_global_status_threads_connected", "legendFormat": "Active" },
+        { "expr": "mysql_global_status_max_connections", "legendFormat": "Max" }
+      ]
+    },
+    {
+      "title": "Queries Per Second",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{ "expr": "rate(mysql_global_status_queries[5m])", "legendFormat": "QPS" }],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "Slow Queries",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [{ "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "Slow/s" }],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "InnoDB Buffer Pool",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [{ "expr": "mysql_global_status_buffer_pool_pages_data / mysql_global_status_buffer_pool_pages_total * 100", "legendFormat": "Used %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 } }
+    },
+    {
+      "title": "Bytes Received/Sent",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "rate(mysql_global_status_bytes_received[5m])", "legendFormat": "Received" },
+        { "expr": "rate(mysql_global_status_bytes_sent[5m])", "legendFormat": "Sent" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" } }
+    },
+    {
+      "title": "Thread Cache Hit Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
+      "targets": [{ "expr": "rate(mysql_global_status_threads_created[5m]) / rate(mysql_global_status_connections[5m]) * 100", "legendFormat": "Hit %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0, "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 95 }] } } }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["mysql", "database"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "MySQL Overview",
+  "uid": "mysql-overview",
+  "version": 1
+}

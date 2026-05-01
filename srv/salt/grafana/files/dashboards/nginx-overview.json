@@ -1,0 +1,53 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(rate(http_requests_total[5m]))", "legendFormat": "req/s" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "title": "Containers Running",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "count(up == 1)", "legendFormat": "Up" }]
+    },
+    {
+      "title": "Targets Health",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "count(up == 1)", "legendFormat": "Healthy" },
+        { "expr": "count(up == 0)", "legendFormat": "Down" }
+      ]
+    },
+    {
+      "title": "Prometheus Scrape Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{ "expr": "scrape_duration_seconds", "legendFormat": "{{job}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Target Status",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [{ "expr": "up", "legendFormat": "{{job}} {{instance}}", "instant": true, "format": "table" }],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "mappings", "value": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }] }] }] }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["prometheus", "monitoring"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Infrastructure Overview",
+  "uid": "infra-overview",
+  "version": 1
+}

@@ -1,0 +1,23 @@
+[server]
+root_url = %(protocol)s://grafana.%(domain)s/
+serve_from_sub_path = false
+
+[security]
+admin_password = {{ admin_password }}
+allow_embedding = true
+
+[auth.anonymous]
+enabled = false
+
+[paths]
+data = /var/lib/grafana
+logs = /var/log/grafana
+plugins = /var/lib/grafana/plugins
+
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+
+[log]
+mode = console
+level = info
