@@ -9,6 +9,7 @@ ExecStartPre=-/usr/bin/podman rm -f nginx
 ExecStart=/usr/bin/podman run \
     --name nginx \
     --rm \
+    --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ nginx_ip }} \
     -p {{ http_port }}:80 \

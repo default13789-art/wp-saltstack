@@ -9,6 +9,7 @@ ExecStartPre=-/usr/bin/podman rm -f wp-node{{ node_num }}
 ExecStart=/usr/bin/podman run \
     --name wp-node{{ node_num }} \
     --rm \
+    --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ node_ip }} \
     -v {{ wp_config_dir }}/wp-config.php:/var/www/html/wp-config.php:ro,z \

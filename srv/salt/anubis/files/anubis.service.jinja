@@ -9,6 +9,7 @@ ExecStartPre=-/usr/bin/podman rm -f anubis
 ExecStart=/usr/bin/podman run \
     --name anubis \
     --rm \
+    --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ anubis_ip }} \
     -v {{ anubis_conf }}/bot-policy.yaml:/etc/anubis/bot-policy.yaml:ro,Z \
