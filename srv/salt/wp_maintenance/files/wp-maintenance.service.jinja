@@ -1,0 +1,9 @@
+[Unit]
+Description=WordPress Maintenance (WP-CLI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ wp_bin }}/wp-maintenance.sh
+User=root

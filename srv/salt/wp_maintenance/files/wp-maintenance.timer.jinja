@@ -1,0 +1,10 @@
+[Unit]
+Description=WordPress Maintenance Timer
+
+[Timer]
+OnCalendar=*-*-* {{ hour }}:{{ minute }}:00
+RandomizedDelaySec=120
+Persistent=true
+
+[Install]
+WantedBy=timers.target
