@@ -27,6 +27,7 @@ base:
     - wordpress
     - monitoring
     - backup
+    - wp_maintenance
     - logrotate
 
   'role:lb':
@@ -57,5 +58,6 @@ base:
     - exporters
     - grafana
     - autoupdate
+    - wp_maintenance
     - logrotate
     - sops
