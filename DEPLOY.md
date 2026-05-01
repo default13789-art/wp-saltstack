@@ -88,7 +88,7 @@ Enforced via systemd `Requires=` / `After=` directives.
 
 ---
 
-create an user with sudo | cause the script remove ssh script 
+create an user with sudo | cause the script remove ssh acess
 
 ## Quick Start — Single Node
 
