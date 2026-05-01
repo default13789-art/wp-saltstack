@@ -1,0 +1,14 @@
+CREATE DATABASE IF NOT EXISTS `{{ wp_db }}`
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS '{{ wp_user }}'@'%'
+  IDENTIFIED BY '{{ wp_pass }}';
+
+GRANT ALL PRIVILEGES ON `{{ wp_db }}`.* TO '{{ wp_user }}'@'%';
+
+DROP DATABASE IF EXISTS test;
+DROP USER IF EXISTS ''@'%';
+DROP USER IF EXISTS ''@'localhost';
+
+FLUSH PRIVILEGES;

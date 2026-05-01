@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+
+USER="{{ podman_user }}"
+PODMAN_UID="{{ podman_uid }}"
+
+podman_as_user() {
+    if [ "$(id -u)" -eq "$PODMAN_UID" ]; then
+        env "XDG_RUNTIME_DIR=/run/user/${PODMAN_UID}" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${PODMAN_UID}/bus" podman "$@"
+    else
+        sudo -u "$USER" env "XDG_RUNTIME_DIR=/run/user/${PODMAN_UID}" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${PODMAN_UID}/bus" podman "$@"
+    fi
+}
+
+CONTAINER=""
+for node in wp-node1 wp-node2; do
+    if podman_as_user inspect --format '{{ '{{' }}.State.Running{{ '}}' }}' "$node" 2>/dev/null | grep -q true; then
+        CONTAINER="$node"
+        break
+    fi
+done
+
+if [ -z "$CONTAINER" ]; then
+    echo "ERROR: No running WordPress container found. Start wp-node1 or wp-node2 first." >&2
+    exit 1
+fi
+
+podman_as_user exec -w /var/www/html "$CONTAINER" php /usr/local/bin/wp-cli.phar "$@"

@@ -1,0 +1,6 @@
+FROM {{ base_image }}
+
+RUN apk add --no-cache gcc g++ make musl-dev autoconf linux-headers \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del gcc g++ make musl-dev autoconf linux-headers

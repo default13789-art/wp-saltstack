@@ -1,0 +1,35 @@
+[Unit]
+Description=Nginx Load Balancer Container (Podman)
+After=container-wp-node1.service container-wp-node2.service
+Wants=container-wp-node1.service container-wp-node2.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f nginx
+ExecStart=/usr/bin/podman run \
+    --name nginx \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ nginx_ip }} \
+    -p {{ http_port }}:80 \
+    -p {{ https_port }}:443 \
+    -v {{ nginx_conf }}/nginx.conf:/etc/nginx/nginx.conf:ro,Z \
+    -v {{ nginx_conf }}/entrypoint.sh:/entrypoint.sh:ro,Z \
+    -v {{ nginx_ssl }}:/etc/letsencrypt:Z \
+    -v {{ wp_core_dir }}:/var/www/html:z \
+    -v {{ uploads_dir }}:/var/www/html/wp-content/uploads:z \
+    -v {{ wp_plugins_dir }}:/var/www/html/wp-content/plugins:z \
+    -v {{ wp_themes_dir }}:/var/www/html/wp-content/themes:z \
+    --health-cmd="wget -qO /dev/null http://localhost/health || exit 1" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=15 \
+    --entrypoint /entrypoint.sh \
+    {{ image }}
+ExecStop=/usr/bin/podman stop -t 15 nginx
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

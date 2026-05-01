@@ -1,0 +1,62 @@
+#!/bin/sh
+set -e
+
+DOMAIN="{{ domain }}"
+SSL_DIR="/etc/letsencrypt"
+CERT_DIR="${SSL_DIR}/live/${DOMAIN}"
+
+if ! command -v certbot >/dev/null 2>&1; then
+    echo "[entrypoint] Installing certbot..."
+    apk add --no-cache certbot >/dev/null 2>&1 || true
+fi
+
+generate_self_signed() {
+    echo "[entrypoint] No certificate found. Generating self-signed fallback..."
+    mkdir -p "${CERT_DIR}"
+    openssl req -x509 -nodes -days 365 \
+        -newkey rsa:2048 \
+        -keyout "${CERT_DIR}/privkey.pem" \
+        -out "${CERT_DIR}/fullchain.pem" \
+        -subj "/CN=${DOMAIN}" \
+        2>/dev/null
+    echo "[entrypoint] Self-signed certificate created at ${CERT_DIR}"
+}
+
+attempt_letsencrypt() {
+    echo "[entrypoint] Attempting Let's Encrypt certificate for ${DOMAIN}..."
+
+    if command -v certbot >/dev/null 2>&1; then
+        certbot certonly \
+            --non-interactive \
+            --agree-tos \
+            --register-unsafely-without-email \
+            --standalone \
+            --http-01-port 80 \
+            -d "${DOMAIN}" \
+            --config-dir "${SSL_DIR}" \
+            --work-dir "${SSL_DIR}/work" \
+            --logs-dir "${SSL_DIR}/logs" \
+            2>&1 && echo "[entrypoint] Let's Encrypt certificate obtained." && return 0
+    fi
+
+    echo "[entrypoint] Let's Encrypt failed or certbot not available. Using fallback."
+    return 1
+}
+
+mkdir -p "${SSL_DIR}/work" "${SSL_DIR}/logs"
+
+cert_needs_issue() {
+    [ ! -f "${CERT_DIR}/fullchain.pem" ] && return 0
+    openssl x509 -checkend 2592000 -noout -in "${CERT_DIR}/fullchain.pem" 2>/dev/null || return 0
+    return 1
+}
+
+if cert_needs_issue; then
+    attempt_letsencrypt
+    if [ $? -ne 0 ] && [ ! -f "${CERT_DIR}/fullchain.pem" ]; then
+        generate_self_signed
+    fi
+fi
+
+echo "[entrypoint] Starting nginx..."
+exec nginx -g "daemon off;"

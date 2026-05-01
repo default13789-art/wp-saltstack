@@ -1,0 +1,31 @@
+[Unit]
+Description=WordPress PHP-FPM Node {{ node_num }} (Podman)
+After=container-mysql.service container-redis.service
+Wants=container-mysql.service container-redis.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f wp-node{{ node_num }}
+ExecStart=/usr/bin/podman run \
+    --name wp-node{{ node_num }} \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ node_ip }} \
+    -v {{ wp_config_dir }}/wp-config.php:/var/www/html/wp-config.php:ro,z \
+    -v {{ uploads_dir }}:/var/www/html/wp-content/uploads:z \
+    -v {{ wp_plugins_dir }}:/var/www/html/wp-content/plugins:z \
+    -v {{ wp_themes_dir }}:/var/www/html/wp-content/themes:z \
+    -v {{ wp_bin_dir }}/wp-cli.phar:/usr/local/bin/wp-cli.phar:ro,z \
+    -v {{ wp_config_dir }}/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro,z \
+    --health-cmd="php-fpm -t 2>/dev/null && pgrep php-fpm >/dev/null" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=15 \
+    {{ image }}
+ExecStop=/usr/bin/podman stop -t 15 wp-node{{ node_num }}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

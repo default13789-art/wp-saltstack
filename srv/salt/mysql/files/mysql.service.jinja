@@ -1,0 +1,28 @@
+[Unit]
+Description=MySQL 8.0 Container (Podman)
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f mysql
+ExecStart=/usr/bin/podman run \
+    --name mysql \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ mysql_ip }} \
+    -e MYSQL_ROOT_PASSWORD={{ mysql_root_pass }} \
+    -e MYSQL_DATABASE={{ mysql_wp_db }} \
+    -v {{ mysql_data }}:/var/lib/mysql:Z \
+    -v {{ mysql_conf }}:/etc/mysql/conf.d:Z \
+    -v {{ mysql_init }}:/docker-entrypoint-initdb.d:Z \
+    --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=30 \
+    {{ image }}
+ExecStop=/usr/bin/podman stop -t 30 mysql
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

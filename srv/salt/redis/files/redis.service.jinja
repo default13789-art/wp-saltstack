@@ -1,0 +1,26 @@
+[Unit]
+Description=Redis 7 Container (Podman)
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f redis
+ExecStart=/usr/bin/podman run \
+    --name redis \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ redis_ip }} \
+    -v {{ redis_data }}:/data:Z \
+    -e REDIS_PASSWORD={{ redis_password }} \
+    --health-cmd="redis-cli -a $$REDIS_PASSWORD --no-auth-warning ping | grep -q PONG" \
+    --health-interval=15s \
+    --health-timeout=3s \
+    --health-retries=3 \
+    --stop-timeout=10 \
+    {{ image }} \
+    redis-server --requirepass {{ redis_password }} --appendonly yes --maxmemory {{ redis_maxmemory }} --maxmemory-policy allkeys-lru
+ExecStop=/usr/bin/podman stop -t 10 redis
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
