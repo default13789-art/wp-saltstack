@@ -1,0 +1,30 @@
+[Unit]
+Description=Prometheus Container (Podman)
+After=container-nginx.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/podman rm -f prometheus
+ExecStart=/usr/bin/podman run \
+    --name prometheus \
+    --rm \
+    --network {{ network_name }} \
+    --ip {{ prometheus_ip }} \
+    -v {{ prometheus_conf }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z \
+    -v {{ prometheus_data }}:/prometheus:Z \
+    --health-cmd="wget -qO /dev/null http://localhost:9090/-/healthy || exit 1" \
+    --health-interval=30s \
+    --health-timeout=5s \
+    --health-retries=3 \
+    --stop-timeout=15 \
+    {{ image }} \
+    --config.file=/etc/prometheus/prometheus.yml \
+    --storage.tsdb.path=/prometheus \
+    --storage.tsdb.retention.time={{ retention_time }} \
+    --web.enable-lifecycle
+ExecStop=/usr/bin/podman stop -t 15 prometheus
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
