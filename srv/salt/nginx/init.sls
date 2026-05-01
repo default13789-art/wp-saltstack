@@ -22,6 +22,16 @@ nginx-ssl-dir:
     - require:
       - file: wp-base-dir
 
+nginx-logs-dir:
+  file.directory:
+    - name: {{ settings.nginx_logs }}
+    - user: {{ u }}
+    - group: {{ u }}
+    - mode: '0755'
+    - makedirs: True
+    - require:
+      - file: wp-base-dir
+
 nginx-wp-plugins-dir:
   file.directory:
     - name: {{ settings.base_dir }}/wp-content/plugins
@@ -85,6 +95,7 @@ nginx-systemd-unit:
         https_port: {{ settings.https_port }}
         nginx_conf: {{ settings.nginx_conf }}
         nginx_ssl: {{ settings.nginx_ssl }}
+        nginx_logs: {{ settings.nginx_logs }}
         uploads_dir: {{ settings.uploads_dir }}
         wp_plugins_dir: {{ settings.base_dir }}/wp-content/plugins
         wp_themes_dir: {{ settings.base_dir }}/wp-content/themes

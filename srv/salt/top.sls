@@ -2,6 +2,7 @@ base:
   'role:security':
     - match: grain
     - security
+    - fail2ban
 
   'role:db':
     - match: grain
@@ -41,3 +42,4 @@ base:
     - security
     - monitoring
     - backup
+    - fail2ban

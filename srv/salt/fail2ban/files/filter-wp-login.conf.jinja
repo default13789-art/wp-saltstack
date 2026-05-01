@@ -1,0 +1,4 @@
+[Definition]
+failregex = ^<HOST> .* "POST /wp-login\.php HTTP.*" (401|403|429|500)
+            ^<HOST> .* "POST /xmlrpc\.php HTTP.*" (401|403|429)
+ignoreregex =

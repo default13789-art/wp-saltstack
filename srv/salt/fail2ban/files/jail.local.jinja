@@ -1,0 +1,38 @@
+[DEFAULT]
+banaction = ufw
+banaction_allports = ufw
+destemail = root@localhost
+sender = root@localhost
+
+{% if ssh_enabled %}
+[sshd]
+enabled = true
+port = {{ ssh_port }}
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = {{ max_retry }}
+findtime = {{ find_time }}
+bantime = {{ ban_time }}
+{% endif %}
+
+{% if nginx_http_auth_enabled %}
+[nginx-http-auth]
+enabled = true
+port = http,https
+filter = nginx-http-auth
+logpath = {{ nginx_log_dir }}/access.log
+maxretry = {{ max_retry }}
+findtime = {{ find_time }}
+bantime = {{ ban_time }}
+{% endif %}
+
+{% if wp_login_enabled %}
+[wp-login]
+enabled = true
+port = http,https
+filter = wp-login
+logpath = {{ nginx_log_dir }}/access.log
+maxretry = {{ wp_login_max_retry }}
+findtime = {{ wp_login_find_time }}
+bantime = {{ wp_login_ban_time }}
+{% endif %}

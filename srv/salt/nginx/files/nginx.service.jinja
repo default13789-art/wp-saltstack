@@ -16,6 +16,7 @@ ExecStart=/usr/bin/podman run \
     -v {{ nginx_conf }}/nginx.conf:/etc/nginx/nginx.conf:ro,Z \
     -v {{ nginx_conf }}/entrypoint.sh:/entrypoint.sh:ro,Z \
     -v {{ nginx_ssl }}:/etc/letsencrypt:Z \
+    -v {{ nginx_logs }}:/var/log/nginx:Z \
     -v {{ wp_core_dir }}:/var/www/html:z \
     -v {{ uploads_dir }}:/var/www/html/wp-content/uploads:z \
     -v {{ wp_plugins_dir }}:/var/www/html/wp-content/plugins:z \

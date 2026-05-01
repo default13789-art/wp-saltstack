@@ -4,6 +4,7 @@
 {% set secrets = salt['pillar.get']('secrets', {}) %}
 {% set monitoring = salt['pillar.get']('monitoring', {}) %}
 {% set backup = salt['pillar.get']('backup', {}) %}
+{% set fail2ban = salt['pillar.get']('fail2ban', {}) %}
 
 {% set settings = {
     'podman_user':      users.get('podman_user', 'podman-wp'),
@@ -78,4 +79,14 @@
     'offsite_type':        backup.get('offsite_type', 'rsync'),
     'offsite_target':      backup.get('offsite_target', ''),
     'offsite_rsync_key':   backup.get('offsite_rsync_key', ''),
+    'nginx_logs':          network.get('nginx_logs', '/srv/wp/nginx/logs'),
+    'f2b_ban_time':        fail2ban.get('ban_time', 3600),
+    'f2b_find_time':       fail2ban.get('find_time', 600),
+    'f2b_max_retry':       fail2ban.get('max_retry', 5),
+    'f2b_ssh_enabled':     fail2ban.get('ssh', {}).get('enabled', true),
+    'f2b_nginx_http_auth_enabled': fail2ban.get('nginx_http_auth', {}).get('enabled', true),
+    'f2b_wp_login_enabled': fail2ban.get('wp_login', {}).get('enabled', true),
+    'f2b_wp_login_max_retry': fail2ban.get('wp_login', {}).get('max_retry', 5),
+    'f2b_wp_login_find_time': fail2ban.get('wp_login', {}).get('find_time', 600),
+    'f2b_wp_login_ban_time': fail2ban.get('wp_login', {}).get('ban_time', 3600),
 } %}

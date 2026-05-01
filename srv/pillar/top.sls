@@ -6,3 +6,4 @@ base:
     - secrets
     - monitoring
     - backup
+    - fail2ban
