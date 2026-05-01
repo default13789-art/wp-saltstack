@@ -8,6 +8,7 @@ ExecStartPre=-/usr/bin/podman rm -f prometheus
 ExecStart=/usr/bin/podman run \
     --name prometheus \
     --rm \
+    --user 0 \
     --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ prometheus_ip }} \

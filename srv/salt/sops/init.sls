@@ -15,6 +15,7 @@ sops-age-keygen:
     - unless: test -f /root/.config/sops/age/keys.txt
     - require:
       - file: sops-age-key-dir
+      - cmd: age-install
     - require_in:
       - cmd: sops-age-pubkey
 
