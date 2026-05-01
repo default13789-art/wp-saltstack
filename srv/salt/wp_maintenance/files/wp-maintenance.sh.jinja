@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LOG_TAG="wp-maintenance"
+log() { logger -t "$LOG_TAG" "$@"; echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+WP="/usr/local/bin/wp"
+
+if ! command -v "$WP" &>/dev/null; then
+    log "ERROR: wp-cli wrapper not found at $WP"
+    exit 1
+fi
+
+# Verify a WordPress container is running
+if ! $WP core is-installed 2>/dev/null; then
+    log "ERROR: WordPress is not installed or no container is running"
+    exit 1
+fi
+
+log "Starting WordPress maintenance"
+
+FAILED=0
+
+{% if update_core %}
+log "Checking WordPress core updates..."
+BEFORE=$($WP core version 2>/dev/null || echo "unknown")
+if $WP core check-update 2>/dev/null | grep -q "Success: WordPress is at the latest version"; then
+    log "Core already up to date ($BEFORE)"
+else
+    if $WP core update 2>&1; then
+        AFTER=$($WP core version 2>/dev/null || echo "unknown")
+        log "Core updated: $BEFORE -> $AFTER"
+    else
+        log "ERROR: Core update failed"
+        FAILED=1
+    fi
+fi
+{% endif %}
+
+{% if update_plugins %}
+log "Updating plugins..."
+EXCLUDE_LIST=({% for p in exclude_plugins %}"{{ p }}" {% endfor %})
+
+UPDATE_LIST=$($WP plugin list --status=active --field=name --format=csv 2>/dev/null | tail -n +2)
+
+if [ -n "$UPDATE_LIST" ]; then
+    while IFS= read -r plugin; do
+        SKIP=false
+        for ex in "${EXCLUDE_LIST[@]}"; do
+            if [ "$plugin" = "$ex" ]; then
+                log "Skipping excluded plugin: $plugin"
+                SKIP=true
+                break
+            fi
+        done
+        if [ "$SKIP" = false ]; then
+            if OUT=$($WP plugin update "$plugin" 2>&1); then
+                log "Plugin updated: $plugin"
+            else
+                log "WARNING: Plugin update failed: $plugin - $OUT"
+            fi
+        fi
+    done <<< "$UPDATE_LIST"
+fi
+
+INACTIVE=$($WP plugin list --status=inactive --field=name --format=csv 2>/dev/null | tail -n +2)
+if [ -n "$INACTIVE" ]; then
+    while IFS= read -r plugin; do
+        if OUT=$($WP plugin update "$plugin" 2>&1); then
+            log "Inactive plugin updated: $plugin"
+        fi
+    done <<< "$INACTIVE"
+fi
+{% endif %}
+
+{% if update_themes %}
+log "Updating themes..."
+if $WP theme update --all 2>&1; then
+    log "Themes updated"
+else
+    log "WARNING: Theme updates had issues"
+fi
+{% endif %}
+
+{% if db_optimize %}
+log "Optimizing database..."
+if $WP db optimize 2>&1; then
+    log "Database optimized"
+else
+    log "WARNING: Database optimization had issues"
+fi
+{% endif %}
+
+{% if transient_cleanup %}
+log "Cleaning transients..."
+DELETED=$($WP transient delete --all 2>/dev/null | grep -oP '\d+' || echo "0")
+log "Transients cleaned: $DELETED deleted"
+{% endif %}
+
+log "Rewriting flush rules..."
+$WP rewrite flush --hard 2>/dev/null || true
+
+log "Maintenance complete (exit code: $FAILED)"
+exit $FAILED
