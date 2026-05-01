@@ -38,6 +38,7 @@ base:
     - prometheus
     - exporters
     - grafana
+    - autoupdate
     - logrotate
 
   'role:all-in-one':
@@ -55,5 +56,6 @@ base:
     - prometheus
     - exporters
     - grafana
+    - autoupdate
     - logrotate
     - sops
