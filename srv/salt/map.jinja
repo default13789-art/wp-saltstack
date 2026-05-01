@@ -7,6 +7,7 @@
 {% set fail2ban = salt['pillar.get']('fail2ban', {}) %}
 {% set mon = salt['pillar.get']('monitoring_grafana', {}) %}
 {% set autoupdate = salt['pillar.get']('autoupdate', {}) %}
+{% set wp_maint = salt['pillar.get']('wp_maintenance', {}) %}
 
 {% set settings = {
     'podman_user':      users.get('podman_user', 'podman-wp'),
@@ -116,4 +117,13 @@
     'autoupdate_hour':     autoupdate.get('schedule_hour', 4),
     'autoupdate_minute':   autoupdate.get('schedule_minute', 0),
     'autoupdate_cleanup':  autoupdate.get('cleanup_images', true),
+    'wp_maint_enabled':   wp_maint.get('enable', true),
+    'wp_maint_hour':      wp_maint.get('schedule_hour', 3),
+    'wp_maint_minute':    wp_maint.get('schedule_minute', 30),
+    'wp_maint_core':      wp_maint.get('update_core', true),
+    'wp_maint_plugins':   wp_maint.get('update_plugins', true),
+    'wp_maint_themes':    wp_maint.get('update_themes', true),
+    'wp_maint_exclude_plugins': wp_maint.get('exclude_plugins', []),
+    'wp_maint_db_optimize': wp_maint.get('db_optimize', true),
+    'wp_maint_transient_cleanup': wp_maint.get('transient_cleanup', true),
 } %}

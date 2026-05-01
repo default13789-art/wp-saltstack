@@ -9,3 +9,4 @@ base:
     - fail2ban
     - monitoring_grafana
     - autoupdate
+    - wp_maintenance
