@@ -51,6 +51,8 @@ backup-redis-dir:
 backup-log-dir:
   file.directory:
     - name: {{ settings.backup_log_dir }}
+    - user: {{ u }}
+    - group: {{ u }}
     - mode: '0755'
     - makedirs: True
 

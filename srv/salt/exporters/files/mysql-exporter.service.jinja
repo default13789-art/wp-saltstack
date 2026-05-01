@@ -11,13 +11,14 @@ ExecStart=/usr/bin/podman run \
     --label io.containers.autoupdate=registry \
     --network {{ network_name }} \
     --ip {{ mysql_exporter_ip }} \
-    -e DATA_SOURCE_NAME="{{ mysql_user }}:{{ mysql_pass }}@({{ mysql_ip }}:3306)/" \
+    -v {{ mysql_exporter_conf }}/.my.cnf:/cfg/.my.cnf:ro,Z \
     --health-cmd="wget -qO /dev/null http://localhost:9104/metrics || exit 1" \
     --health-interval=30s \
     --health-timeout=5s \
     --health-retries=3 \
     --stop-timeout=10 \
-    {{ image }}
+    {{ image }} \
+    --config.my-cnf=/cfg/.my.cnf
 ExecStop=/usr/bin/podman stop -t 10 mysql-exporter
 Restart=on-failure
 RestartSec=5

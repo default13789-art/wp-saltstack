@@ -44,6 +44,31 @@ node-exporter-service:
     - onchanges:
       - file: node-exporter-systemd-unit
 
+mysql-exporter-conf-dir:
+  file.directory:
+    - name: {{ settings.base_dir }}/exporters/mysql
+    - user: {{ u }}
+    - group: {{ u }}
+    - mode: '0755'
+    - makedirs: True
+    - require:
+      - file: wp-base-dir
+
+mysql-exporter-my-cnf:
+  file.managed:
+    - name: {{ settings.base_dir }}/exporters/mysql/.my.cnf
+    - source: salt://exporters/files/my.cnf.jinja
+    - template: jinja
+    - context:
+        mysql_user: {{ settings.mysql_wp_user }}
+        mysql_pass: {{ settings.mysql_wp_pass }}
+        mysql_ip: {{ settings.mysql_ip }}
+    - user: {{ u }}
+    - group: {{ u }}
+    - mode: '0600'
+    - require:
+      - file: mysql-exporter-conf-dir
+
 mysql-exporter-systemd-unit:
   file.managed:
     - name: {{ h }}/.config/systemd/user/container-mysql-exporter.service
@@ -52,15 +77,14 @@ mysql-exporter-systemd-unit:
     - context:
         network_name: {{ settings.network_name }}
         mysql_exporter_ip: {{ settings.mysql_exporter_ip }}
-        mysql_ip: {{ settings.mysql_ip }}
-        mysql_user: {{ settings.mysql_wp_user }}
-        mysql_pass: {{ settings.mysql_wp_pass }}
+        mysql_exporter_conf: {{ settings.base_dir }}/exporters/mysql
         image: {{ settings.images.mysql_exporter }}
     - user: {{ u }}
     - group: {{ u }}
     - mode: '0644'
     - require:
       - file: wp-systemd-dir
+      - file: mysql-exporter-my-cnf
 
 mysql-exporter-daemon-reload:
   cmd.run:
